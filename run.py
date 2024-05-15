@@ -14,11 +14,12 @@ if __name__ == '__main__':
     acc_fea = []
     acc_str = []
     acc_stu = []
-    repeats = 10
+    repeats = args.repeat
+    # 控制训练重复的轮数
     for repeat in range(repeats):
-        print('-------------------- Repeat {} Start -------------------'.format(repeat))
+        print('-------------------- Repeat {} Start -------------------'.format(repeat+1))
 
-        train = Train(args,repeat,acc_fea,acc_str,acc_stu)
+        train = Train(args,acc_fea,acc_str,acc_stu)
         t_total = time.time()
 
         # pre-train Feature teacher model
@@ -31,35 +32,31 @@ if __name__ == '__main__':
             train.pre_train_teacher_str(epoch)
         train.save_checkpoint(ts='teacher_str')
 
-        # load best pre-train teahcer models
-        train.load_checkpoint(ts='teacher_fea')
-        train.load_checkpoint(ts='teacher_str')
-        print('\n--------------\n')
-
         # train student model GCN
         for epoch in range(args.epoch_stu):
             train.train_student(epoch)
         train.save_checkpoint(ts='student')
 
-        ## test teahcer models
-        train.test('teacher_fea')
-        train.test('teacher_str')
-
+        # load best pre-train teahcer models
+        train.load_checkpoint(ts='teacher_fea')
+        train.load_checkpoint(ts='teacher_str')
         # test student model GCN
         train.load_checkpoint(ts='student')
+
+        ## test models
+        train.test('teacher_fea')
+        train.test('teacher_str')
         train.test('student')
 
         print('******************** Repeat {} Done ********************\n'.format(repeat+1))
 
-
-    print('Result: {}'.format(acc_fea))
-    print('Avg acc: {:.6f}'.format(sum(acc_fea) / repeats))
-    print('Result: {}'.format(acc_str))
-    print('Avg acc: {:.6f}'.format(sum(acc_str) / repeats))
-    print('Result: {}'.format(acc_str))
-    print('Result: {}'.format(acc_stu))
-    print('Avg acc: {:.6f}'.format(sum(acc_stu) / repeats))
-    print('\nAll Done!')
+    print('Run on {} dataset'.format(args.dataset))
+    print('Run on {} txt'.format(train.repeat))
+    print('Total time elapsed: {:.4f}s'.format(time.time() - t_total))
+    print('Total repeats: {}'.format(repeats))
+    print('{} epoch Fea Test Acc: {} Test Avg: {:.6f}'.format(args.epoch_fea,acc_fea,sum(acc_fea) / repeats))
+    print('{} epoch Str Test Acc: {} Test Avg: {:.6f}'.format(args.epoch_str,acc_str,sum(acc_str) / repeats))
+    print('{} epoch Stu Test Acc: {} Test Avg: {:.6f}'.format(args.epoch_stu,acc_stu,sum(acc_stu) / repeats))
 
 
 

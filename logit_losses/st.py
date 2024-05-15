@@ -4,7 +4,7 @@ from __future__ import division
 import torch.nn as nn
 import torch.nn.functional as F
 
-
+# 师生之间的蒸馏损失
 class SoftTarget(nn.Module):
 	'''
 	Distilling the Knowledge in a Neural Network

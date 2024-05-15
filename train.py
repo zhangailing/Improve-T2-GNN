@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import scipy.sparse as sp
-from utils import load_data, accuracy
+from utils import load_raw_data, accuracy
 from models import GCN, Teacher_F, Teacher_S
 from args import args
 from logit_losses import *
@@ -14,9 +14,10 @@ from ppr_matrix import topk_ppr_matrix
 
 # Model and optimizer
 class Train:
-    def __init__(self, args,repeat,acc_fea,acc_str,acc_stu):
+    def __init__(self, args,acc_fea,acc_str,acc_stu):
         self.args = args
-        self.repeat = repeat
+        self.repeat = 9
+        # 控制加载分片数据集的
         self.best_teacher_fea_val, self.best_teacher_str_val, self.best_student_val = 0, 0, 0
         self.teacher_fea_state,  self.teacher_str_state, self.student_state = None, None, None
         self.load_data()
@@ -40,17 +41,12 @@ class Train:
                                   dropout=self.args.dropout_str,
                                   device=args.device)
         self.str_model.to(args.device)
-
-        self.stu_model = GCN(nfeat=self.features.shape[1],
-                           nhid=self.args.hidden_stu,
-                           nclass=self.labels_oneHot.shape[1],
-                           dropout=self.args.dropout_stu,
-                           nhid_feat=self.args.hidden_fea,
-                           nhid_stru=self.args.hidden_str)
+        # nfeat 每个节点的特征维度，nhid 学生隐藏层节点数量，nclass 输出类别维度，nhid_feat 老师特征隐藏层节点数量，nhid_stru 老师结构隐藏层节点数量 
+        self.stu_model = GCN(nfeat=self.features.shape[1],nhid=self.args.hidden_stu,nclass=self.labels_oneHot.shape[1],dropout=self.args.dropout_stu,nhid_feat=self.args.hidden_fea,nhid_stru=self.args.hidden_str)
 
         self.stu_model.to(args.device)
 
-        # Setup loss criterion
+        # Setup loss criterion，前3个是预测和真实标签的损失，后1个是蒸馏损失
         self.criterionTeacherFea = nn.CrossEntropyLoss()
         self.criterionTeacherStr = nn.CrossEntropyLoss()
         self.criterionStudent = nn.CrossEntropyLoss()
@@ -63,17 +59,17 @@ class Train:
 
     def load_data(self):
         # load data
-        self.ttadj, self.tadj, self.adj, self.features, self.labels, self.labels_oneHot, self.train_idx, self.val_idx, self.test_idx = load_data(args.dataset, self.repeat,
-                                                                                       args.device, args.rate)
+        self.ttadj, self.tadj, self.adj, self.features, self.labels, self.labels_oneHot, self.train_idx, self.val_idx, self.test_idx = load_raw_data(args.dataset, self.repeat,args.device, args.rate)
+
         doc_node_indices = list(range(self.ttadj.shape[0]))
-        ppr_matrix = topk_ppr_matrix(sp.csr_matrix(self.ttadj, dtype=float), args.alpha_ppr, args.epsilon,
-                                     doc_node_indices, args.topk,
-                                     keep_nodes=doc_node_indices)
+
+        ppr_matrix = topk_ppr_matrix(sp.csr_matrix(((self.ttadj).cpu()).numpy(), dtype=float), args.alpha_ppr, args.epsilon,doc_node_indices, args.topk,keep_nodes=doc_node_indices)
         ppr_matrix = torch.FloatTensor(ppr_matrix.todense()).to(args.device)
+        
         self.tadj = (self.tadj + ppr_matrix).to(args.device) # A+A_ppr
 
-        print('Data load init finish')
-        print('Num nodes: {} | Num features: {} | Num classes: {}'.format(
+        print('{}'+'Data load init finish'.format(args.dataset))
+        print('Num nodes: {} | Num features: {} | Num classes: {}\n'.format(
             self.adj.shape[0], self.features.shape[1], self.labels_oneHot.shape[1] + 1))
 
     def pre_train_teacher_fea(self,epoch):
@@ -204,9 +200,7 @@ class Train:
             model = self.stu_model
             criterion = self.criterionStudent
             model.eval()
-
             output, _ = model(self.adj, self.features)
-
             loss_test = criterion(output[self.test_idx], self.labels[self.test_idx])
             acc_test = accuracy(output[self.test_idx], self.labels[self.test_idx])
             print("{ts} Test set results:".format(ts=ts),
@@ -219,15 +213,14 @@ class Train:
         filename += '_{ts}'.format(ts=ts)
         if ts == 'teacher_fea':
             torch.save(self.teacher_fea_state, filename)
-            print('Successfully saved feature teacher model\n...')
+            print('Successfully saved feature teacher model...\n')
         elif ts == 'teacher_str':
             torch.save(self.teacher_str_state, filename)
-            print('Successfully saved structure teacher model\n...')
+            print('Successfully saved structure teacher model...\n')
         elif ts == 'student':
             torch.save(self.student_state, filename)
-            print('Successfully saved student model\n...')
-        
-        
+            print('Successfully saved student model...\n')
+          
     def load_checkpoint(self, filename='./.checkpoints/'+ args.dataset, ts='teacher_fea'):
         print('Load {ts} model...'.format(ts=ts))
         filename += '_{ts}'.format(ts=ts)
@@ -235,21 +228,23 @@ class Train:
             load_state = torch.load(filename)
             self.fea_model.load_state_dict(load_state['state_dict'])
             self.optimizerTeacherFea.load_state_dict(load_state['optimizer'])
-            print('Successfully Loaded feature teacher model\n...')
+            print('Successfully Loaded feature teacher model...')
             print("Best Epoch:", load_state['best_epoch'])
             print("Best acc_val:", load_state['best_val'].item())
+            print("\n")
         elif ts == 'teacher_str':
             load_state = torch.load(filename)
             self.str_model.load_state_dict(load_state['state_dict'])
             self.optimizerTeacherStr.load_state_dict(load_state['optimizer'])
-            print('Successfully Loaded structure teacher model\n...')
+            print('Successfully Loaded structure teacher model...')
             print("Best Epoch:", load_state['best_epoch'])
             print("Best acc_val:", load_state['best_val'].item())
+            print("\n")
         elif ts == 'student':
             load_state = torch.load(filename)
             self.stu_model.load_state_dict(load_state['state_dict'])
             self.optimizerStudent.load_state_dict(load_state['optimizer'])
-            print('Successfully Loaded student model\n...')
+            print('Successfully Loaded student model...')
             print("Best Epoch:", load_state['best_epoch'])
             print("Best acc_val:", load_state['best_val'].item())
 
