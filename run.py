@@ -75,8 +75,8 @@ if __name__ == '__main__':
 
         print('******************** Repeat {} Done ********************\n'.format(repeat + 1))
 
-    print('Run on {} dataset'.format(args.dataset))
+    print('{} repeats Run on {} dataset'.format(repeats,args.dataset))
     print('Total time elapsed: {:.4f}s'.format(time.time() - t_total))
-    print('{} epoch Feature Teacher Test Acc Avg: {:.6f}'.format(actual_epochs_fea,sum(acc_fea) / repeats))
-    print('{} epoch Structure Teacher Test Acc Avg: {:.6f}'.format(actual_epochs_str,sum(acc_str) / repeats))
-    print('{} epoch Student Test Acc Avg: {:.6f}'.format(actual_epochs_stu,sum(acc_stu) / repeats))
+    print('{} epoch Feature Teacher train, Test Acc Avg: {:.6f}'.format(actual_epochs_fea,sum(acc_fea) / repeats))
+    print('{} epoch Structure Teacher train, Test Acc Avg: {:.6f}'.format(actual_epochs_str,sum(acc_str) / repeats))
+    print('{} epoch Student train, Test Acc Avg: {:.6f}'.format(actual_epochs_stu,sum(acc_stu) / repeats))
