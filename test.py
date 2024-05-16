@@ -75,7 +75,10 @@ def plot_training_results(results, dataset):
 
     # Plotting teacher_str loss and accuracy
     plt.subplot(1, 3, 2)
-    plt.plot(repeats, teacher_str_loss, label='Loss', marker='o', color='red')
+    if len(repeats) != len(teacher_str_loss):
+        print(f"Cannot plot because lengths of 'repeats' ({len(repeats)}) and 'teacher_str_loss' ({len(teacher_str_loss)}) do not match.")
+    else:
+        plt.plot(repeats, teacher_str_loss, label='Loss', marker='o', color='red')
     plt.plot(repeats, teacher_str_accuracy, label='Accuracy', marker='o', color='green')
     plt.title(f'{dataset} Teacher_str Test Set Results')
     plt.xlabel('Repeat')

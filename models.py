@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from layers import GraphConvolution
+from torch_geometric.nn import SAGEConv
 
 class Teacher_F(nn.Module):
     def __init__(self, num_nodes, in_size, hidden_size, out_size, num_layers, dropout):
@@ -44,28 +45,40 @@ class Teacher_F(nn.Module):
         return h, middle_representations
 
 class Teacher_S(nn.Module):
-    def __init__(self, num_nodes, in_size, hidden_size, out_size, dropout, device):
+    def __init__(self, num_nodes, in_size, hidden_size, out_size,dropout, device, num_layers):
         super(Teacher_S, self).__init__()
 
-        self.tgc1 = GraphConvolution(in_size, hidden_size)
-        self.tgc2 = GraphConvolution(hidden_size, out_size)
+        self.layers = nn.ModuleList()
+        self.layers.append(SAGEConv(in_size, hidden_size))
+        for _ in range(num_layers - 2):
+            self.layers.append(SAGEConv(hidden_size, hidden_size))
+        self.layers.append(SAGEConv(hidden_size, out_size))
+
+        self.residual_layers = nn.ModuleList()
+        self.residual_layers.append(nn.Linear(in_size, hidden_size))
+        for _ in range(num_layers - 2):
+            self.residual_layers.append(nn.Linear(hidden_size, hidden_size))
+        self.residual_layers.append(nn.Linear(hidden_size, out_size))
+
         self.dropout = dropout
         self.linear = nn.Linear(num_nodes, in_size, bias=True)
-        # 生成一个n*n的单位矩阵，用作图中节点的初始特征
         self.pe_feat = torch.FloatTensor(torch.eye(num_nodes)).to(device)
 
     def forward(self, adj):
         middle_representations = []
         pe = self.linear(self.pe_feat)
-        # pe = F.dropout(pe, self.dropout, training=self.training)
-        h = self.tgc1(pe, adj)
-        middle_representations.append(h)
-        h = F.relu(h)
-        h = F.dropout(h, self.dropout, training=self.training)
-        h = self.tgc2(h, adj)
-        middle_representations.append(h)
+        h = pe
+        for i, (layer, residual_layer) in enumerate(zip(self.layers, self.residual_layers)):
+            h_prev = h
+            h = layer(h, adj)
+            if i != len(self.layers) - 1:
+                h = F.leaky_relu(h)
+                h = F.dropout(h, self.dropout, training=self.training)
+            h += residual_layer(h_prev)  # Adjust the size of h_prev before adding
+            middle_representations.append(h)
 
         return h, middle_representations
+
 #Student
 class  GCN(nn.Module):
     def __init__(self, nfeat, nhid, nclass, dropout, nhid_feat, nhid_stru, tau=0.5):

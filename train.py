@@ -11,6 +11,7 @@ from models import GCN, Teacher_F, Teacher_S
 from args import args
 from logit_losses import *
 from ppr_matrix import topk_ppr_matrix
+from torch_geometric.utils import dense_to_sparse
 
 # Model and optimizer
 class Train:
@@ -18,7 +19,14 @@ class Train:
         self.args = args
         self.repeat = 9
         # 控制加载分片数据集的
-        self.best_teacher_fea_val, self.best_teacher_str_val, self.best_student_val = 0, 0, 0
+        self.best_teacher_fea_val = 0
+        self.best_teacher_str_val = 0
+        self.best_student_val = 0
+        self.patience_counter_fea = 0
+        self.patience_counter_str = 0
+        self.patience_counter_stu = 0
+        self.patience = args.patience  # This should be defined in args.py
+        
         self.teacher_fea_state,  self.teacher_str_state, self.student_state = None, None, None
         self.load_data()
         self.acc_list_fea = acc_fea
@@ -39,7 +47,7 @@ class Train:
                                   hidden_size=self.args.hidden_str,
                                   out_size=self.labels_oneHot.shape[1],
                                   dropout=self.args.dropout_str,
-                                  device=args.device)
+                                  device=args.device,num_layers=2)
         self.str_model.to(args.device)
         # nfeat 每个节点的特征维度，nhid 学生隐藏层节点数量，nclass 输出类别维度，nhid_feat 老师特征隐藏层节点数量，nhid_stru 老师结构隐藏层节点数量 
         self.stu_model = GCN(nfeat=self.features.shape[1],nhid=self.args.hidden_stu,nclass=self.labels_oneHot.shape[1],dropout=self.args.dropout_stu,nhid_feat=self.args.hidden_fea,nhid_stru=self.args.hidden_str)
@@ -68,7 +76,7 @@ class Train:
         
         self.tadj = (self.tadj + ppr_matrix).to(args.device) # A+A_ppr
 
-        print('{}'+'Data load init finish'.format(args.dataset))
+        print('{} Data load init finishd'.format(args.dataset))
         print('Num nodes: {} | Num features: {} | Num classes: {}\n'.format(
             self.adj.shape[0], self.features.shape[1], self.labels_oneHot.shape[1] + 1))
 
@@ -92,24 +100,35 @@ class Train:
 
         if acc_val > self.best_teacher_fea_val:
             self.best_teacher_fea_val = acc_val
+            self.patience_counter_fea = 0
+            # Save the checkpoint when improvement is observed
             self.teacher_fea_state = {
                 'state_dict': self.fea_model.state_dict(),
                 'best_val': acc_val,
-                'best_epoch': epoch+1,
+                'best_epoch': epoch + 1,
                 'optimizer': self.optimizerTeacherFea.state_dict(),
             }
+        else:
+            self.patience_counter_fea += 1
+            if self.patience_counter_fea >= self.patience:
+                print("Early stopping for Feature Teacher at epoch", epoch)
+                return True
+    
         print('Epoch: {:04d}'.format(epoch+1),
               'loss_train: {:.4f}'.format(loss_train.item()),
               'acc_train: {:.4f}'.format(acc_train.item()),
               'loss_val: {:.4f}'.format(loss_val.item()),
               'acc_val: {:.4f}'.format(acc_val.item()),
               'time: {:.4f}s'.format(time.time() - t))
+        
+        return False
 
     def pre_train_teacher_str(self, epoch):
         t = time.time()
         self.str_model.train()
         self.optimizerTeacherStr.zero_grad()
-        output,_ = self.str_model(self.tadj)
+        edge_index, _ = dense_to_sparse(self.tadj)
+        output,_ = self.str_model(edge_index)
         loss_train = self.criterionTeacherStr(output[self.train_idx], self.labels[self.train_idx])
         acc_train = accuracy(output[self.train_idx], self.labels[self.train_idx])
         loss_train.backward()
@@ -117,25 +136,35 @@ class Train:
 
         if not self.args.fastmode:
             self.str_model.eval()
-            output,_ = self.str_model(self.tadj)
+            output,_ = self.str_model(edge_index)
 
         loss_val = self.criterionTeacherStr(output[self.val_idx], self.labels[self.val_idx])
         acc_val = accuracy(output[self.val_idx], self.labels[self.val_idx])
 
         if acc_val > self.best_teacher_str_val:
             self.best_teacher_str_val = acc_val
+            self.patience_counter_str = 0
+            # Save the checkpoint when improvement is observed
             self.teacher_str_state = {
                 'state_dict': self.str_model.state_dict(),
                 'best_val': acc_val,
                 'best_epoch': epoch + 1,
-                'optimizer': self.optimizerTeacherStr.state_dict(),  # 保留模型和参数
+                'optimizer': self.optimizerTeacherStr.state_dict(),
             }
+        else:
+            self.patience_counter_str += 1
+            if self.patience_counter_str >= self.patience:
+                print("Early stopping for Structure Teacher at epoch", epoch)
+                return True
+
         print('Epoch: {:04d}'.format(epoch + 1),
               'loss_train: {:.4f}'.format(loss_train.item()),
               'acc_train: {:.4f}'.format(acc_train.item()),
               'loss_val: {:.4f}'.format(loss_val.item()),
               'acc_val: {:.4f}'.format(acc_val.item()),
               'time: {:.4f}s'.format(time.time() - t))
+        
+        return False
         
     def train_student(self, epoch):
         t = time.time()
@@ -144,7 +173,8 @@ class Train:
 
         output, middle_emb_stu = self.stu_model(self.adj, self.features)
         soft_target_fea, middle_emb_fea = self.fea_model(self.features)
-        soft_target_str, middle_emb_str = self.str_model(self.tadj)
+        edge_index, _ = dense_to_sparse(self.tadj)
+        soft_target_str, middle_emb_str = self.str_model(edge_index)
         contrast_fea, contrast_str = self.stu_model.loss(middle_emb_stu, middle_emb_fea, middle_emb_str)
         loss_train = self.criterionStudent(output[self.train_idx], self.labels[self.train_idx]) + self.args.lambd * (self.criterionStudentKD(output, soft_target_fea) + contrast_fea) + (1 - self.args.lambd)*(self.criterionStudentKD(output, soft_target_str) + contrast_str)
         acc_train = accuracy(output[self.train_idx], self.labels[self.train_idx])
@@ -160,18 +190,28 @@ class Train:
 
         if acc_val > self.best_student_val:
             self.best_student_val = acc_val
+            self.patience_counter_stu = 0
+            # Save the checkpoint when improvement is observed
             self.student_state = {
                 'state_dict': self.stu_model.state_dict(),
                 'best_val': acc_val,
-                'best_epoch': epoch+1,
+                'best_epoch': epoch + 1,
                 'optimizer': self.optimizerStudent.state_dict(),
             }
+        else:
+            self.patience_counter_stu += 1
+            if self.patience_counter_stu >= self.patience:
+                print("Early stopping for Student at epoch", epoch)
+                return True       
+            
         print('Epoch: {:04d}'.format(epoch+1),
               'loss_train: {:.4f}'.format(loss_train.item()),
               'acc_train: {:.4f}'.format(acc_train.item()),
               'loss_val: {:.4f}'.format(loss_val.item()),
               'acc_val: {:.4f}'.format(acc_val.item()),
               'time: {:.4f}s'.format(time.time() - t))
+        
+        return False
         
     def test(self, ts='teacher_fea'):
         if ts == 'teacher_fea':
@@ -189,7 +229,8 @@ class Train:
             model = self.str_model
             criterion = self.criterionTeacherStr
             model.eval()
-            output,_ = model(self.tadj)
+            edge_index, _ = dense_to_sparse(self.tadj)
+            output, _ = model(edge_index)
             loss_test = criterion(output[self.test_idx], self.labels[self.test_idx])
             acc_test = accuracy(output[self.test_idx], self.labels[self.test_idx])
             print("{ts} Test set results:".format(ts=ts),

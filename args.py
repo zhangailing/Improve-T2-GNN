@@ -20,14 +20,14 @@ python run.py --dataset pubmed --Ts 1.0 --topk 0 --lambd 0.3 --epoch_fea 100 --e
 parser.add_argument('--num_fea_layers', type=int, default=2, help='Number pf layers for Feature Teacher')
 parser.add_argument('--hidden_fea', type=int, default=512,help='Number of hidden units.')
 parser.add_argument('--dropout_fea', type=float, default=0.5, help='Dropout rate.')
-parser.add_argument('--epoch_fea', type=int, default=100, help='Number of epochs for Feature Teacher')
+parser.add_argument('--epoch_fea', type=int, default=1000, help='Number of epochs for Feature Teacher')
 parser.add_argument('--lr_fea', type=float, default=0.001, help='Initial learning rate.')
 parser.add_argument('--weight_decay_fea', type=float, default=0.0005, help='Weight decay (L2 loss on parameters).')
 
 #Structure Teacher
 parser.add_argument('--hidden_str', type=int, default=128,help='Number of hidden units.')
 parser.add_argument('--dropout_str', type=float, default=0.5, help='Dropout rate.')
-parser.add_argument('--epoch_str', type=int, default=100, help='Number of epochs for Structure Teacher')
+parser.add_argument('--epoch_str', type=int, default=1000, help='Number of epochs for Structure Teacher')
 parser.add_argument('--alpha_ppr', default=0.15, type=float, help='alpha_ppr')
 parser.add_argument('--epsilon', default=1e-4, type=float, help='epsilon')
 parser.add_argument('--topk', type=int, default=10, help='topk')
@@ -35,7 +35,7 @@ parser.add_argument('--lr_str', type=float, default=0.001, help='Initial learnin
 parser.add_argument('--weight_decay_str', type=float, default=0.0005, help='Weight decay (L2 loss on parameters).')
 
 #Student (GCN)
-parser.add_argument('--epoch_stu', type=int, default=100, help='Max number of epochs for gcn. Default is 400.')
+parser.add_argument('--epoch_stu', type=int, default=1000, help='Max number of epochs for gcn. Default is 400.')
 parser.add_argument('--num_gcn_layers', type=int, default=2, help='Number pf layers for gcn')
 parser.add_argument('--hidden_stu', type=int, default=64,help='Number of hidden units.')
 parser.add_argument('--dropout_stu', type=float, default=0.5, help='Dropout rate (1 - keep probability).')
@@ -52,6 +52,7 @@ parser.add_argument('--fastmode', action='store_true', default=False, help='Vali
 parser.add_argument('--repeat', type=int, default=5, help='repeat.')
 parser.add_argument('--no_cuda', action='store_false', default=True, help='Disables CUDA training.')
 parser.add_argument('--seed', type=int, default=42, help='Random seed.')
+parser.add_argument('--patience', type=int, default=100, help='Number of epochs to wait for improvement before early stopping')
 args = parser.parse_args()
 args.device = torch.device('cuda:0' if args.no_cuda and torch.cuda.is_available() else 'cpu')
 args.name = args.name + '_' + time.strftime('%d_%m_%Y') + '_' + time.strftime('%H:%M:%S')
