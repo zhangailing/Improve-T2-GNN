@@ -96,7 +96,7 @@ def plot_training_results(results, dataset):
     plt.tight_layout()
     plt.savefig(f'output/{dataset}.png')  # Save the figure in the output directory with the dataset name
   
-cmd = "python run.py --dataset texas --Ts 4.0 --topk 10 --lambd 0.8 --epoch_fea 200 --epoch_str 1000 --epoch_stu 100 --repeat 5"
+cmd = "python run.py --dataset texas --Ts 4.0 --topk 10 --lambd 0.8 --repeat 5"
 output, dataset = run_command(cmd)
 results = parse_output(output)
 plot_training_results(results, dataset)

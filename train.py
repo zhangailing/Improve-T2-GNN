@@ -16,14 +16,19 @@ from ppr_matrix import topk_ppr_matrix
 class Train:
     def __init__(self, args,acc_fea,acc_str,acc_stu):
         self.args = args
-        self.repeat = 9
-        # 控制加载分片数据集的
+        self.repeat = 0
+        # 控制加载哪个分片数据集的
         self.best_teacher_fea_val, self.best_teacher_str_val, self.best_student_val = 0, 0, 0
         self.teacher_fea_state,  self.teacher_str_state, self.student_state = None, None, None
         self.load_data()
         self.acc_list_fea = acc_fea
         self.acc_list_str = acc_str
         self.acc_list = acc_stu
+
+        # 早停
+        self.fea_no_improve_epochs,self.str_no_improve_epochs,self.stu_no_improve_epochs = 0,0,0
+        self.patience= args.patience
+        self.min_delta= args.min_delta
 
         # Model Initialization
         self.fea_model = Teacher_F(num_nodes=self.features.shape[0],
@@ -90,7 +95,7 @@ class Train:
         loss_val = self.criterionTeacherFea(output[self.val_idx], self.labels[self.val_idx])
         acc_val = accuracy(output[self.val_idx], self.labels[self.val_idx])
 
-        if acc_val > self.best_teacher_fea_val:
+        if acc_val > self.best_teacher_fea_val+self.min_delta:
             self.best_teacher_fea_val = acc_val
             self.teacher_fea_state = {
                 'state_dict': self.fea_model.state_dict(),
@@ -98,12 +103,21 @@ class Train:
                 'best_epoch': epoch+1,
                 'optimizer': self.optimizerTeacherFea.state_dict(),
             }
+            self.fea_no_improve_epochs = 0
+        else:
+            self.fea_no_improve_epochs += 1
+
+        if self.fea_no_improve_epochs >= self.patience:
+            print(f"Stopping early at epoch {epoch + 1}")
+            return True
+    
         print('Epoch: {:04d}'.format(epoch+1),
               'loss_train: {:.4f}'.format(loss_train.item()),
               'acc_train: {:.4f}'.format(acc_train.item()),
               'loss_val: {:.4f}'.format(loss_val.item()),
               'acc_val: {:.4f}'.format(acc_val.item()),
               'time: {:.4f}s'.format(time.time() - t))
+        return False
 
     def pre_train_teacher_str(self, epoch):
         t = time.time()
@@ -122,7 +136,7 @@ class Train:
         loss_val = self.criterionTeacherStr(output[self.val_idx], self.labels[self.val_idx])
         acc_val = accuracy(output[self.val_idx], self.labels[self.val_idx])
 
-        if acc_val > self.best_teacher_str_val:
+        if acc_val > self.best_teacher_str_val+self.min_delta:
             self.best_teacher_str_val = acc_val
             self.teacher_str_state = {
                 'state_dict': self.str_model.state_dict(),
@@ -130,12 +144,21 @@ class Train:
                 'best_epoch': epoch + 1,
                 'optimizer': self.optimizerTeacherStr.state_dict(),  # 保留模型和参数
             }
+            self.str_no_improve_epochs = 0
+        else:
+            self.str_no_improve_epochs += 1
+
+        if self.str_no_improve_epochs >= self.patience:
+            print(f"Stopping early at epoch {epoch + 1}")
+            return True
+        
         print('Epoch: {:04d}'.format(epoch + 1),
               'loss_train: {:.4f}'.format(loss_train.item()),
               'acc_train: {:.4f}'.format(acc_train.item()),
               'loss_val: {:.4f}'.format(loss_val.item()),
               'acc_val: {:.4f}'.format(acc_val.item()),
               'time: {:.4f}s'.format(time.time() - t))
+        return False
         
     def train_student(self, epoch):
         t = time.time()
@@ -158,7 +181,7 @@ class Train:
         loss_val = self.criterionStudent(output[self.val_idx], self.labels[self.val_idx])
         acc_val = accuracy(output[self.val_idx], self.labels[self.val_idx])
 
-        if acc_val > self.best_student_val:
+        if acc_val > self.best_student_val+self.min_delta:
             self.best_student_val = acc_val
             self.student_state = {
                 'state_dict': self.stu_model.state_dict(),
@@ -166,12 +189,21 @@ class Train:
                 'best_epoch': epoch+1,
                 'optimizer': self.optimizerStudent.state_dict(),
             }
+            self.stu_no_improve_epochs = 0
+        else:
+            self.stu_no_improve_epochs += 1
+
+        if self.stu_no_improve_epochs >= self.patience:
+            print(f"Stopping early at epoch {epoch + 1}")
+            return True
+            
         print('Epoch: {:04d}'.format(epoch+1),
               'loss_train: {:.4f}'.format(loss_train.item()),
               'acc_train: {:.4f}'.format(acc_train.item()),
               'loss_val: {:.4f}'.format(loss_val.item()),
               'acc_val: {:.4f}'.format(acc_val.item()),
               'time: {:.4f}s'.format(time.time() - t))
+        return False
         
     def test(self, ts='teacher_fea'):
         if ts == 'teacher_fea':
