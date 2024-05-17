@@ -21,7 +21,7 @@ if __name__ == '__main__':
 
     # 控制训练重复的轮数
     for repeat in range(repeats):
-        print('-------------------- Repeat {} Start -------------------'.format(repeat+1))
+        print('******************** Repeat {} Done ********************\n'.format(repeat+1))
 
         train = Train(args,acc_fea,acc_str,acc_stu)
         t_total = time.time()

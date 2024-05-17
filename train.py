@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.optim as optim
 import scipy.sparse as sp
 from utils import load_raw_data, accuracy
-from models import GCN, Teacher_F, Teacher_S
+from models import GCN_Stu,GAT_Stu,SAGE_Stu,APPNP_Stu,Teacher_F,Teacher_S
 from args import args
 from logit_losses import *
 from ppr_matrix import topk_ppr_matrix
@@ -47,7 +47,15 @@ class Train:
                                   device=args.device)
         self.str_model.to(args.device)
         # nfeat 每个节点的特征维度，nhid 学生隐藏层节点数量，nclass 输出类别维度，nhid_feat 老师特征隐藏层节点数量，nhid_stru 老师结构隐藏层节点数量 
-        self.stu_model = GCN(nfeat=self.features.shape[1],nhid=self.args.hidden_stu,nclass=self.labels_oneHot.shape[1],dropout=self.args.dropout_stu,nhid_feat=self.args.hidden_fea,nhid_stru=self.args.hidden_str)
+
+        # GCN
+        # self.stu_model = GCN_Stu(nfeat=self.features.shape[1],nhid=self.args.hidden_stu,nclass=self.labels_oneHot.shape[1],dropout=self.args.dropout_stu,nhid_feat=self.args.hidden_fea,nhid_stru=self.args.hidden_str)
+        # GAT
+        # self.stu_model = GAT_Stu(nfeat=self.features.shape[1],nhid=self.args.hidden_stu,nclass=self.labels_oneHot.shape[1],dropout=self.args.dropout_stu,nhid_feat=self.args.hidden_fea,nhid_stru=self.args.hidden_str)
+        # SAGE
+        # self.stu_model = SAGE_Stu(nfeat=self.features.shape[1],nhid=self.args.hidden_stu,nclass=self.labels_oneHot.shape[1],dropout=self.args.dropout_stu,nhid_feat=self.args.hidden_fea,nhid_stru=self.args.hidden_str)
+        # APPNP
+        self.stu_model = APPNP_Stu(nfeat=self.features.shape[1],nhid=self.args.hidden_stu,nclass=self.labels_oneHot.shape[1],dropout=self.args.dropout_stu,nhid_feat=self.args.hidden_fea,nhid_stru=self.args.hidden_str)
 
         self.stu_model.to(args.device)
 
@@ -73,7 +81,7 @@ class Train:
         
         self.tadj = (self.tadj + ppr_matrix).to(args.device) # A+A_ppr
 
-        print('{}'+'Data load init finish'.format(args.dataset))
+        print('{} Data load init finish'.format(args.dataset))
         print('Num nodes: {} | Num features: {} | Num classes: {}\n'.format(
             self.adj.shape[0], self.features.shape[1], self.labels_oneHot.shape[1] + 1))
 
