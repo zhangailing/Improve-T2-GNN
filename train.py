@@ -48,14 +48,14 @@ class Train:
         self.str_model.to(args.device)
         # nfeat 每个节点的特征维度，nhid 学生隐藏层节点数量，nclass 输出类别维度，nhid_feat 老师特征隐藏层节点数量，nhid_stru 老师结构隐藏层节点数量 
 
-        # GCN
-        # self.stu_model = GCN_Stu(nfeat=self.features.shape[1],nhid=self.args.hidden_stu,nclass=self.labels_oneHot.shape[1],dropout=self.args.dropout_stu,nhid_feat=self.args.hidden_fea,nhid_stru=self.args.hidden_str)
-        # GAT
-        # self.stu_model = GAT_Stu(nfeat=self.features.shape[1],nhid=self.args.hidden_stu,nclass=self.labels_oneHot.shape[1],dropout=self.args.dropout_stu,nhid_feat=self.args.hidden_fea,nhid_stru=self.args.hidden_str)
-        # SAGE
-        # self.stu_model = SAGE_Stu(nfeat=self.features.shape[1],nhid=self.args.hidden_stu,nclass=self.labels_oneHot.shape[1],dropout=self.args.dropout_stu,nhid_feat=self.args.hidden_fea,nhid_stru=self.args.hidden_str)
-        # APPNP
-        self.stu_model = APPNP_Stu(nfeat=self.features.shape[1],nhid=self.args.hidden_stu,nclass=self.labels_oneHot.shape[1],dropout=self.args.dropout_stu,nhid_feat=self.args.hidden_fea,nhid_stru=self.args.hidden_str)
+        if args.model == 'GCN':
+            self.stu_model = GCN_Stu(nfeat=self.features.shape[1],nhid=self.args.hidden_stu,nclass=self.labels_oneHot.shape[1],dropout=self.args.dropout_stu,nhid_feat=self.args.hidden_fea,nhid_stru=self.args.hidden_str)
+        elif args.model == 'GAT':
+            self.stu_model = GAT_Stu(nfeat=self.features.shape[1],nhid=self.args.hidden_stu,nclass=self.labels_oneHot.shape[1],dropout=self.args.dropout_stu,nhid_feat=self.args.hidden_fea,nhid_stru=self.args.hidden_str)
+        elif args.model == 'SAGE':
+            self.stu_model = SAGE_Stu(nfeat=self.features.shape[1],nhid=self.args.hidden_stu,nclass=self.labels_oneHot.shape[1],dropout=self.args.dropout_stu,nhid_feat=self.args.hidden_fea,nhid_stru=self.args.hidden_str)
+        elif args.model == 'APPNP':
+            self.stu_model = APPNP_Stu(nfeat=self.features.shape[1],nhid=self.args.hidden_stu,nclass=self.labels_oneHot.shape[1],dropout=self.args.dropout_stu,nhid_feat=self.args.hidden_fea,nhid_stru=self.args.hidden_str)
 
         self.stu_model.to(args.device)
 

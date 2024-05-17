@@ -68,6 +68,7 @@ if __name__ == '__main__':
         print('******************** Repeat {} Done ********************\n'.format(repeat+1))
 
     print('Run on {} dataset'.format(args.dataset))
+    print('Stu model is {}'.format(args.model))
     print('Run on {} txt'.format(train.repeat))
     print('Total time elapsed: {:.4f}s'.format(time.time() - t_total))
     print('Total repeats: {}'.format(repeats))

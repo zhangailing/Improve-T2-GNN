@@ -43,7 +43,7 @@ parser.add_argument('--Ts', type=float, default=1.0, help='temperature for ST')
 parser.add_argument('--lambd', type=float, default=0.5, help='trade-off parameter for kd loss')
 parser.add_argument('--lr_stu', type=float, default=0.01, help='Initial learning rate.')
 parser.add_argument('--weight_decay_stu', type=float, default=5e-4,  help='Weight decay (L2 loss on parameters).')
-
+parser.add_argument('--model', type=str, default='GCN', choices=['GCN', 'GAT', 'SAGE', 'APPNP'], help='Choose which student model to use')
 # 实验总设置
 parser.add_argument('--dataset', type=str, default="texas", help='dataset.')
 parser.add_argument('--rate', default=0.3, type=float, help='masking rate')
